@@ -1,0 +1,344 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<!-- saved from url=(0071)http://homepages.cs.ncl.ac.uk/nick.cook/csc2025/minix/syscall-exercise1 -->
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<style type="text/css">
+    code {font-size: 120%; } 
+    pre {font-size: 120%; } 
+</style>
+
+<title>Minix System Call Exercise 1</title>
+</head>
+<body>
+
+<h1>Minix System Call Exercise 1</h1>
+
+<p>In this exercise we will implement a new Minix system call as part of the Process Manager (PM) server.</p>
+
+<p>To implement a PM server system call in Minix we need to complete the following steps:</p>
+
+<ol>
+<li>in <code>/usr/src/servers/pm/table.c</code> add an entry to the PM server system call table/array that maps a call number (the array position) to the C system call routine/function you will implement</li>
+<li>in <code>/usr/src/include/minix/callnr.h</code> add a call number definition for the table entry added in step 1</li>
+<li>in <code>/usr/src/servers/pm/proto.h</code> define the system call's function prototype</li>
+<li>in <code>/usr/src/servers/pm</code> create a C file that contains the implementation of the function defined in <code>proto.h</code></li>
+<li>in <code>/usr/src/servers/pm/Makefile</code> add the name of the C file to the list of SRCS to compile with the PM server</li>
+</ol>
+
+<p>The following instructions add a system call (<code>printmsg</code>) that simply results in the PM server printing a message. At the end we will also see how to add this system call to the C library for use by application programs.</p>
+
+<h3>1 Adding the PM server table entry</h3>
+
+<p>The file <code>/usr/src/servers/pm/table.c</code> includes the following declaration of a table of system calls implemented by the PM server:</p>
+
+<pre>int (*call_vec[])(void) = {
+    no_sys,             /*  0 = unuse   */
+    do_exit,            /*  1 = exit    */
+    do_fork,            /*  2 = fork    */
+    no_sys,             /*  3 = read    */
+    no_sys,             /*  4 = write   */
+    no_sys,             /*  5 = open    */
+    no_sys,             /*  6 = close   */
+    do_waitpid,         /*  7 = wait    */
+    no_sys,             /*  8 = creat   */
+    ...
+    ...
+    no_sys,             /* 69 = unused  */
+    ...
+    ...
+};
+</pre>
+
+<p>There is one entry in the table for each system call and the position in the table is the system call number.</p>
+
+<p>To add a system call to the PM server, we will replace one of the unused table entries with the name of the function that will implement our system call. We can use any "unused" entry in the table. For this exercise, we will use entry 69. </p>
+
+<p>Replace the line:</p>
+
+<pre>    no_sys,             /* 69 = unused  */
+</pre>
+
+<p>with:</p>
+
+<pre>    do_printmsg,        /* 69 = printmsg  */
+</pre>
+
+<h3>2 Defining the system call number</h3>
+
+<p>In the file <code>/usr/src/include/minix/callnr.h</code> you will see a list of macro definitions of the form:</p>
+
+<pre>#define EXIT        1 
+#define FORK        2 
+#define READ        3 
+#define WRITE       4 
+#define OPEN        5 
+#define CLOSE       6 
+#define WAIT        7
+#define CREAT       8 
+#define LINK        9 
+#define UNLINK     10 
+...
+...
+</pre>
+
+<p>These macros define the system call number and symbols (<code>EXIT</code>, <code>FORK</code> etc.) that can be used in place of the the call number.</p>
+
+<p>To define our system call we just need to add the following line to <code>callnr.h</code>:</p>
+
+<pre>#define PRINTMSG   69
+</pre>
+
+<p>Now we can use <code>PRINTMSG</code> as the system call name and map the corresponding call number, 69, to the entry for <code>do_printmsg</code> in <code>/usr/src/servers/pm/table.c</code>.</p>
+
+<h3>3 Defining the system call's prototype</h3>
+
+<p>Users of our <code>do_printmsg</code> system call will need a function prototype in order to invoke <code>do_printmsg</code>. The function prototype is defined in <code>/usr/src/servers/pm/proto.h</code>. Open <code>proto.h</code> and you will see a number of function definitions. We will add our function definition after the <code>misc.c</code> list of definitions.</p>
+
+<p>Find the following lines in <code>/usr/src/servers/pm/proto.h</code>:</p>
+
+<pre>/* misc.c */
+int do_reboot(void);
+int do_sysuname(void);
+int do_getsysinfo(void);
+int do_getprocnr(void);
+int do_getepinfo(void);
+int do_getepinfo_o(void);
+int do_svrctl(void);
+</pre>
+
+<p>And add the following line: </p>
+
+<pre>int do_printmsg(void);
+</pre>
+
+<p>This defines the function prototype for the system call.</p>
+
+<h3>4 Implementing the system call</h3>
+
+<p>We must now provide an implementation of our <code>do_printmsg</code> system call function. The initial implementation of the system call will simply print the message <code>"System call do_printmsg called"</code>.</p>
+
+<p>In the <code>/usr/src/servers/pm</code> directory, add a new C file with the following contents:</p>
+
+<pre>#include &lt;stdio.h&gt;
+
+int do_printmsg() {
+    printf("System call do_printmsg called\n");
+    return 0;
+}
+</pre>
+
+<p>Note, you can call the C file what you wish - <code>do_printmsg.c</code> is as good a name as any.</p>
+
+<p>We now have a system call table entry, the definition of a system call number, the definition of a system call prototype and an implementation of our system call.</p>
+
+<p>Now we need to make sure that the new system call is compiled with the PM server.</p>
+
+<h3>5 Including the system call in PM server compilation</h3>
+
+<p>To include the system call in the PM server compilation we must add the name of the file created in part 4 to the PM server's <code>Makefile</code>. Open the file <code>/usr/src/servers/pm/Makefile</code> and you will see the following line:</p>
+
+<pre>SRCS=	main.c forkexit.c break.c exec.c time.c alarm.c \
+	signal.c utility.c table.c getset.c misc.c \
+	profile.c schedule.c
+</pre>
+
+<p>To include our implementation in the compiled server we simply add the C file name from part 4 to the list of <code>SRCS</code> to compile, as follows:</p>
+
+<pre>SRCS=	main.c forkexit.c break.c exec.c time.c alarm.c \
+	signal.c utility.c table.c getset.c misc.c \
+	profile.c schedule.c do_printmsg.c
+</pre>
+
+<p>(assuming <code>do_printmsg.c</code> is the name of the source file.)</p>
+
+<h3><a name="part6">6 Compiling and testing the system call</a></h3>
+
+<p>If parts 1-5 have been followed correctly, we can compile our system call and include it in the boot image by completing the following steps:</p>
+
+<ol>
+<li>In <code>/usr/src/releasetools</code> type:<br> <strong><code>make services</code></strong><br>
+The first time you do <code>make services</code> the kernel and all OS services will be recompiled, and you may see some compiler warnings. You can ignore compiler warnings that are not generated by the files you changed. If you do not clean/delete object (.o) files, subsequent <code>make services</code> commands will take less time.</li>
+<li>Then type: <br> <strong><code>make install</code></strong><br>
+You can ignore the <code>"git: not found"</code> message at the end of compilation</li>
+<li>Then <strong>reboot</strong> (to run the new version of Minix)</li>
+</ol>
+
+<p>If all of the above succeeds, we now have a new system call in Minix. We do not yet have a user level library interface to the system call but we can still use the new system call by invoking the Minix specific <code>_syscall</code> function.</p>
+
+<p>Having compiled our new system call and rebooted, we can use the following program to test our new system call:</p>
+
+<pre>#include &lt;lib.h&gt;    // provides _syscall and message
+#include &lt;stdio.h&gt;
+
+int main(void) {
+    message m;  // Minix uses message to pass parameters to a system call
+    
+    _syscall(PM_PROC_NR, PRINTMSG, &amp;m);
+        /* _syscall leads to the system server identified by PM_PRO_NR (the PM
+         * server process) invoking the function identified by call number 
+         * PRINTMSG with parameters in the message copied to address &amp;m
+         */   
+}
+</pre>
+
+<p>So, create the above test program in <code>/root</code> or a subdirectory, compile it as normal using cc and check that you get the output expected. If it works, the message <code>"System call do_printmsg called"</code> will be output to the Minix console.</p>
+
+<h3><a name="part7">7 Passing a parameter to a system call</a></h3>
+
+<p>We could now create a library function for users. In essence, the library function would be the same as the test program in part 6. First, we will see how to use Minix messages to pass a parameter to a system call. Instead of just printing out a fixed message string, we will modify our system call to accept a single integer parameter and print the given integer in our message.</p>
+
+<p>To do this we need to understand a little about Minix messages.</p>
+
+<p>A message is a struct defined in <code>/usr/src/include/minix/ipc.h</code>. The struct contains a union of message types.</p>
+
+<p>For our purposes we are only interested in message type 1 (<code>mess_1</code>). Message <code>mess_1</code> has member fields that allow us to pass up to three <code>int</code> parameters and up to three pointers (<code>char *</code> types - or pointer to a char or, in effect, a byte or the start address of an array of bytes).</p>
+
+<p>The declaration:</p>
+
+<pre>    message m;  // Minix uses message to pass parameters to a system call
+</pre>
+
+<p>in part 6 above declares a message. The address of the message in the calling process is passed to the kernel (as a result of the call to <code>_syscall</code>). The kernel then copies the message to receiving process endpoint (PM in this case). In the receiving process, the message is available as the global variable <code>m_in</code>. That is, the message is available as <code>m_in</code> in the body of the <code>do_printmsg</code> function. In our current implementations, we do not set message fields in the calling process nor do we use any message fields in the receiving process.</p>
+
+<p>To pass an integer parameter we just have to assign to one member of our message. <code>/usr/src/include/minix/ipc.h</code> defines some useful names for the members of different messages. For example, <code>m1_i1</code> is the 1st integer parameter of a message of type 1 (<code>mess_1</code>). So, to pass a parameter to our system call we just have to assign a value to the member <code>m1_i1</code> of our message. For example:</p>
+
+<pre>    m.m1_i1 = 10;
+</pre>
+
+<p>would pass 10 as the first integer field of the message to the system call.</p>
+
+<p>We can modify the test program in part 6 to pass any integer we like to the system call, as follows:</p>
+
+<pre>#include &lt;lib.h&gt;    // provides _syscall and message
+#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt; // provides atoi
+
+int main(int argc, char **argv) {
+    if (argc &lt; 2)
+        exit(1);    // expecting at least 1 integer parameter to test program
+        
+    int i = atoi(argv[1]);
+    
+    message m;      // Minix uses message to pass parameters to a system call
+    
+    m.m1_i1 = i;    // set first integer of message to i
+    
+    _syscall(PM_PROC_NR, PRINTMSG, &amp;m);
+        /* _syscall leads to the system server identified by PM_PRO_NR (the PM
+         * server process) invoking the function identified by call number 
+         * PRINTMSG with parameters in the message copied to address &amp;m
+         */   
+}
+</pre>
+
+<p>We can compile and run the above test program. It will work but the output of the <code>do_printmsg</code> system call will not change because we have not modified <code>do_printmsg</code> to use the message value <code>m.m1_i1</code>. So, we will modify <code>do_printmsg</code> to print <code>"System call do_printmsg called with value i\n"</code> (where "i" is replaced with the value of the integer parameter <code>m.m1_i1</code>). To do this we just need to change the system call implementation from part 4. The modified implementation of <code>/usr/src/servers/pm/do_printmsg.c</code> is:</p>
+
+<pre>#include &lt;stdio.h&gt;
+#include "pm.h"         // provides global variables such as m_in
+
+int do_printmsg() {
+    int i = m_in.m1_i1; /* m_in is a global variable set to PM's
+                         * incoming message, 
+                         * So m_in.m1_i1 is the integer parameter set in our
+                         * test program above.
+                         */
+    
+    printf("System call do_printmsg called with value %d\n", i);
+    return 0;
+}
+</pre>
+
+<p>Once again follow the compilation steps:</p>
+
+<ol>
+<li>In <code>/usr/src/releasetools</code> type:<br> <strong><code>make services</code></strong></li>
+<li>Then type: <br> <strong><code>make install</code></strong></li>
+<li>Then <strong>reboot</strong> (to run the new version of Minix)</li>
+</ol>
+
+<p>If you now run the modified test program with the argument 10, e.g.:</p>
+
+<pre># ./a.out 10
+</pre>
+
+<p>you should see the following output on the Minix console:</p>
+
+<pre>System call do_printmsg called with value 10
+</pre>
+
+<p>You can execute the test program with different values and the output from <code>do_printmsg</code> will change accordingly.</p>
+
+<h3><a name="part8">8 Writing a user library function for the system call</a></h3>
+
+<p>When, as users, we invoke a system call such as <code>fork</code> or <code>execve</code> we do not have to deal with the low level Minix details of messages or system call numbers or calling the <code>_syscall</code> function. We simply invoke a library routine, that in turn invokes the underlying system call with an appropriate message. We will now provide a library routine/function that will call our <code>do_printmsg</code> system call.</p>
+
+<p>Our library function will be called <code>printmsg</code> and will have the following function prototype:</p>
+
+<pre>int printmsg(int val);
+</pre>
+
+<p>The implementation of the <code>printmsg</code> function will be:</p>
+
+<pre>#include &lt;lib.h&gt;      // provides _syscall and message
+#include &lt;unistd.h&gt;   // provides function prototype (see step 1 below)
+
+int printmsg(int val) {
+    message m;      // Minix message to pass parameters to a system call
+    
+    m.m1_i1 = val;  // set first integer of message to val
+    
+    return _syscall(PM_PROC_NR, PRINTMSG, &amp;m);  // invoke underlying system call
+}
+</pre>
+
+<p>It is essentially the code we used to test the <code>do_printmsg</code> system call in part 7.</p>
+
+<p>For simplicity, we will make our library function available to users by adding it the standard library as follows:</p>
+
+<ol>
+<li>In <code>/usr/src/include/unistd.h</code> add the function prototype for <code>printmsg</code> on a line by itself immediately before the line <code>__END_DECLS</code> towards the end of the file.</li>
+<li>In directory <code>/usr/src/lib/libc/sys-minix</code> create a C file called <code>printmsg.c</code> that contains the implementation of the <code>printmsg</code> function shown above.</li>
+<li>Add <code>printmsg.c</code> to the list of <code>SRCS</code> in <code>/usr/src/lib/libc/sys-minix/Makefile.inc</code></li>
+</ol>
+
+<p>We now need to recompile the Minix libraries so that we can use our new library function. To do this:</p>
+
+<ol>
+<li>In <code>/usr/src</code> type:<br>
+<strong><code>make build</code></strong><br>
+Note: the build will take a long time (15 minutes, maybe more). It will also generate compiler warnings. You can ignore compiler warnings that are not caused by the files you changed. You can redirect output to a file and only see warnings on the console. This will make it easier to spot warnings caused by your changes. You only need to use <code>make build</code> when you change the libraries. When making changes that are confined to a Minix server such as PM, use the quicker compilations <code>make services</code> and <code>make install</code> in <code>/usr/src/releasetools</code>.
+</li>
+<li>Then <strong>reboot</strong> (to run the new version of Minix)</li>
+</ol>
+
+<p>We can now test our library function. In <code>/root</code> or a sub-directory, create and compile the following user program:</p>
+
+<pre>#include &lt;unistd.h&gt;
+#include &lt;stdlib.h&gt;
+
+int main(int argc, char **argv) {
+    if (argc &lt; 2)
+        exit(1);    // expecting at least 1 integer parameter to test program
+        
+    int i = atoi(argv[1]);
+    
+    printmsg(i);
+}
+</pre>
+
+<p>Then, if you run the program as follows:</p>
+
+<pre># ./a.out 10
+</pre>
+
+<p>you should see the same output to console as in part 7.</p>
+
+<p>Note the user program is not written in terms of low-level Minix functions but the higher level <code>printmsg</code> library function that in turn invokes the lower-level system call.</p>
+
+<p>A second exercise will be available soon that will explain how to obtain information about processes in the system from the PM process table. In the meantime, look at how other PM system calls are implemented (e.g. <code>fork</code>). Ignoring the detail of the implementations, you will see that they all follow the same pattern of definitions in <code>table.c</code>, <code>callnr.h</code> and <code>proto.h</code>. Implementations are then compiled with the PM server (and included in the <code>Makefile</code>). Minix messages are used to pass parameters to system calls. And library functions are provided as part of the standard library.</p>
+<hr>
+<a href="http://homepages.cs.ncl.ac.uk/nick.cook/csc2025/" title="csc2025 resources">Back to CSC2025 resources index ... </a>
+<p></p>
+
+
+
+</body></html>
